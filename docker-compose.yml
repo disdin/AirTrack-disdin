@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=${MONGODB_URI}
+      - OPENAQ_BASE_URL=https://api.openaq.org/v2
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - OPENWEATHER_BASE_URL=https://api.openweathermap.org/data/2.5
+      - FRONTEND_URL=http://localhost:3000
+      - CACHE_TTL=300
+      - API_RATE_LIMIT_WINDOW=900000
+      - API_RATE_LIMIT_MAX_REQUESTS=100
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/package*.json:/app/
+    depends_on:
+      - mongodb
+    networks:
+      - airtrack-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
+      - NEXT_PUBLIC_APP_NAME=AirTrack
+      - NEXT_PUBLIC_APP_VERSION=1.0.0
+      - NEXT_PUBLIC_DEFAULT_MAP_CENTER_LAT=40.7128
+      - NEXT_PUBLIC_DEFAULT_MAP_CENTER_LNG=-74.0060
+      - NEXT_PUBLIC_DEFAULT_MAP_ZOOM=10
+      - NEXT_PUBLIC_ENABLE_DARK_MODE=true
+      - NEXT_PUBLIC_ENABLE_FAVORITES=true
+      - NEXT_PUBLIC_ENABLE_WEATHER=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - airtrack-network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_INITDB_DATABASE=airtrack
+    volumes:
+      - mongodb_data:/data/db
+      - ./backend/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - airtrack-network
+    restart: unless-stopped
+
+networks:
+  airtrack-network:
+    driver: bridge
+
+volumes:
+  mongodb_data: 
